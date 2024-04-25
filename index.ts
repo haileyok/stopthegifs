@@ -98,6 +98,7 @@ const processLabel = async () => {
   if (!next) return
 
   emitLabel(next.uri, next.cid, next.label)
+  queue.delete(next)
 }
 
 const run = async () => {
