@@ -44,7 +44,6 @@ const emitLabel = async (uri: string, cid: string) => {
 }
 
 const handleMessage =  (message: SubscribeReposMessage): void => {
-  try {
     if (ComAtprotoSyncSubscribeRepos.isCommit(message)) {
       const repo = message.repo
       const op = message.ops[0]
@@ -58,18 +57,27 @@ const handleMessage =  (message: SubscribeReposMessage): void => {
 
       if (!cid) return
 
-      if (AppBskyEmbedExternal.isMain(op.payload.embed) && op.payload.embed.external.uri.includes("media.tenor.com")) {
-        emitLabel(uri, cid)
-        console.log(`Labeled ${uri}`)
+      try {
+        if (AppBskyEmbedExternal.isMain(op.payload.embed) && op.payload.embed.external.uri.includes("media.tenor.com")) {
+          emitLabel(uri, cid)
+          console.log(`Labeled ${uri}`)
+        }
+      } catch(e) {
+        console.log('Failed on regular')
+        console.log(uri)
+      }
+
+      try {
         // @ts-ignore I'm lazy here
-      } else if (AppBskyEmbedRecordWithMedia.isMain(op.payload.embed) && op.payload.embed.media.external?.uri.includes("media.tenor.com")) {
-        emitLabel(uri, cid)
-        console.log(`Labeled ${uri}`)
+        if (AppBskyEmbedRecordWithMedia.isMain(op.payload.embed) && op.payload.embed.media.external?.uri.includes("media.tenor.com")) {
+          emitLabel(uri, cid)
+          console.log(`Labeled ${uri}`)
+        }
+      } catch(e) {
+        console.log('Failed on other')
+        console.log(uri)
       }
     }
-  } catch (e: any) {
-    console.log(e)
-  }
 }
 
 const run = async () => {
