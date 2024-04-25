@@ -21,12 +21,12 @@ const login = async () => {
   })
 }
 
-const emitLabel = async (uri: string, cid: string) => {
+const emitLabel = async (uri: string, cid: string, label: 'tenor-gif' | 'tenor-gif-no-text') => {
   try {
     await agent.withProxy('atproto_labeler', 'did:plc:mjyeurqmqjeexbgigk3yytvb').api.tools.ozone.moderation.emitEvent({
       event: {
         $type: 'tools.ozone.moderation.defs#modEventLabel',
-        createLabelVals: ['tenor-gif'],
+        createLabelVals: [label],
         negateLabelVals: [],
       },
       subject: {
@@ -59,7 +59,11 @@ const handleMessage =  (message: SubscribeReposMessage): void => {
 
       try {
         if (AppBskyEmbedExternal.isMain(op.payload.embed) && op.payload.embed.external.uri.includes("media.tenor.com")) {
-          emitLabel(uri, cid)
+          if (!op.payload.text || op.payload.text === '') {
+            console.log('Labelling as no text: ' + uri)
+            emitLabel(uri, cid, 'tenor-gif-no-text')
+          }
+          emitLabel(uri, cid, 'tenor-gif')
           console.log(`Labeled ${uri}`)
         }
       } catch(e) {
@@ -70,7 +74,11 @@ const handleMessage =  (message: SubscribeReposMessage): void => {
       try {
         // @ts-ignore I'm lazy here
         if (AppBskyEmbedRecordWithMedia.isMain(op.payload.embed) && op.payload.embed.media.external?.uri.includes("media.tenor.com")) {
-          emitLabel(uri, cid)
+          if (!op.payload.text || op.payload.text === '') {
+            console.log('Labelling as no text: ' + uri)
+            emitLabel(uri, cid, 'tenor-gif-no-text')
+          }
+          emitLabel(uri, cid, 'tenor-gif')
           console.log(`Labeled ${uri}`)
         }
       } catch(e) {
