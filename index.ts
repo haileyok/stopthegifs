@@ -1,7 +1,6 @@
 import {
   AppBskyEmbedExternal,
-  AppBskyEmbedImages, AppBskyEmbedRecord, AppBskyEmbedRecordWithMedia,
-  AppBskyFeedDefs,
+  AppBskyEmbedRecordWithMedia,
   AppBskyFeedPost,
   BskyAgent,
 } from '@atproto/api'
@@ -9,6 +8,9 @@ import * as dotenv from 'dotenv'
 import {ComAtprotoSyncSubscribeRepos, subscribeRepos, SubscribeReposMessage} from 'atproto-firehose'
 
 dotenv.config()
+
+let queueInterval: NodeJS.Timeout | undefined = undefined
+const queue = new Set<{uri: string, cid: string, label: 'tenor-gif' | 'tenor-gif-no-text'}>()
 
 const agent = new BskyAgent({
   service: 'https://bsky.social/',
@@ -37,9 +39,16 @@ const emitLabel = async (uri: string, cid: string, label: 'tenor-gif' | 'tenor-g
       createdBy: agent.session?.did ?? '',
       createdAt: new Date().toISOString(),
       subjectBlobCids: [],
-    }) 
+    })
+
+    console.log(`Emitted label for ${uri} with ${cid} using label ${label}`)
   } catch (e: any) {
-    console.log(e)
+    console.log('Failed to emit label. Taking a break 🥵')
+    clearInterval(queueInterval)
+
+    setTimeout(() => {
+      queueInterval = setInterval(processLabel, 20)
+    }, 15e3)
   }
 }
 
@@ -60,11 +69,9 @@ const handleMessage =  (message: SubscribeReposMessage): void => {
       try {
         if (AppBskyEmbedExternal.isMain(op.payload.embed) && op.payload.embed.external.uri.includes("media.tenor.com")) {
           if (!op.payload.text || op.payload.text === '') {
-            console.log('Labelling as no text: ' + uri)
-            emitLabel(uri, cid, 'tenor-gif-no-text')
+            queue.add({uri, cid, label: 'tenor-gif-no-text'})
           }
-          emitLabel(uri, cid, 'tenor-gif')
-          console.log(`Labeled ${uri}`)
+          queue.add({uri, cid, label: 'tenor-gif'})
         }
       } catch(e) {
         console.log('Failed on regular')
@@ -75,11 +82,9 @@ const handleMessage =  (message: SubscribeReposMessage): void => {
         // @ts-ignore I'm lazy here
         if (AppBskyEmbedRecordWithMedia.isMain(op.payload.embed) && op.payload.embed.media.external?.uri.includes("media.tenor.com")) {
           if (!op.payload.text || op.payload.text === '') {
-            console.log('Labelling as no text: ' + uri)
-            emitLabel(uri, cid, 'tenor-gif-no-text')
+            queue.add({uri, cid, label: 'tenor-gif-no-text'})
           }
-          emitLabel(uri, cid, 'tenor-gif')
-          console.log(`Labeled ${uri}`)
+          queue.add({uri, cid, label: 'tenor-gif'})
         }
       } catch(e) {
         console.log('Failed on other')
@@ -88,13 +93,22 @@ const handleMessage =  (message: SubscribeReposMessage): void => {
     }
 }
 
+const processLabel = async () => {
+  const next = queue.values().next().value
+  if (!next) return
+
+  emitLabel(next.uri, next.cid, next.label)
+}
+
 const run = async () => {
   await login()
-  
+
   const firehose = subscribeRepos('wss://bsky.network', {
     decodeRepoOps: true,
   })
   firehose.on('message', handleMessage)
+
+  queueInterval = setInterval(processLabel, 20)
 }
 
 run()
