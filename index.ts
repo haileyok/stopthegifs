@@ -22,43 +22,53 @@ const login = async () => {
 }
 
 const emitLabel = async (uri: string, cid: string) => {
-  await agent.withProxy('atproto_labeler', 'did:plc:mjyeurqmqjeexbgigk3yytvb').api.tools.ozone.moderation.emitEvent({
-    event: {
-      $type: 'tools.ozone.moderation.defs#modEventLabel',
-      createLabelVals: ['tenor-gif'],
-      negateLabelVals: [],
-    },
-    subject: {
-      $type: 'com.atproto.repo.strongRef',
-      uri,
-      cid,
-    },
-    createdBy: agent.session?.did ?? '',
-    createdAt: new Date().toISOString(),
-    subjectBlobCids: [],
-  }) 
+  try {
+    await agent.withProxy('atproto_labeler', 'did:plc:mjyeurqmqjeexbgigk3yytvb').api.tools.ozone.moderation.emitEvent({
+      event: {
+        $type: 'tools.ozone.moderation.defs#modEventLabel',
+        createLabelVals: ['tenor-gif'],
+        negateLabelVals: [],
+      },
+      subject: {
+        $type: 'com.atproto.repo.strongRef',
+        uri,
+        cid,
+      },
+      createdBy: agent.session?.did ?? '',
+      createdAt: new Date().toISOString(),
+      subjectBlobCids: [],
+    }) 
+  } catch (e: any) {
+    console.log(e)
+  }
 }
 
 const handleMessage =  (message: SubscribeReposMessage): void => {
-  if (ComAtprotoSyncSubscribeRepos.isCommit(message)) {
-    const repo = message.repo
-    const op = message.ops[0]
+  try {
+    if (ComAtprotoSyncSubscribeRepos.isCommit(message)) {
+      const repo = message.repo
+      const op = message.ops[0]
 
-    if (!AppBskyFeedPost.isRecord(op?.payload)) {
-      return
+      if (!AppBskyFeedPost.isRecord(op?.payload)) {
+        return
+      }
+
+      const uri = `at://${repo}/${op.path}`
+      const cid = op.cid?.toString()
+
+      if (!cid) return
+
+      if (AppBskyEmbedExternal.isMain(op.payload.embed) && op.payload.embed.external.uri.includes("media.tenor.com")) {
+        emitLabel(uri, cid)
+        console.log(`Labeled ${uri}`)
+        // @ts-ignore I'm lazy here
+      } else if (AppBskyEmbedRecordWithMedia.isMain(op.payload.embed) && op.payload.embed.media.external?.uri.includes("media.tenor.com")) {
+        emitLabel(uri, cid)
+        console.log(`Labeled ${uri}`)
+      }
     }
-
-    const uri = `at://${repo}/${op.path}`
-    const cid = op.cid?.toString()
-
-    if (!cid) return
-
-    if (AppBskyEmbedExternal.isMain(op.payload.embed) && op.payload.embed.external.uri.includes("media.tenor.com")) {
-      emitLabel(uri, cid)
-      // @ts-ignore I'm lazy here
-    } else if (AppBskyEmbedRecordWithMedia.isMain(op.payload.embed) && op.payload.embed.media.external?.uri.includes("media.tenor.com")) {
-      emitLabel(uri, cid)
-    }
+  } catch (e: any) {
+    console.log(e)
   }
 }
 
