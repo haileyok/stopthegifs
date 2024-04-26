@@ -110,6 +110,9 @@ const run = async () => {
   firehose.on('message', handleMessage)
 
   queueInterval = setInterval(processLabel, 20)
+  setInterval(() => {
+    agent.refreshSession()
+  }, 60e3 * 30)
 }
 
 run()
